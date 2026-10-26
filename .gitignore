@@ -1,0 +1,19 @@
+*.iml
+.gradle/
+.kotlin/
+build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.DS_Store
+
+# Android Studio kişisel ayarları
+.idea/
+
+# Yerel yedekler
+_yedek_cocuk_kilidi/
+
+# APK'lar depoya değil GitHub Release'e konur
+*.apk
+*.aab
