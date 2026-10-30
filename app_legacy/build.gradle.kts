@@ -10,8 +10,8 @@ android {
         applicationId = "com.example.videoloop.legacy"
         minSdk = 19
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0-legacy"
+        versionCode = 2
+        versionName = "1.1-legacy"
     }
 
     buildTypes {
