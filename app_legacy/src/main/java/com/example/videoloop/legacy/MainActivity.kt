@@ -61,6 +61,29 @@ class MainActivity : AppCompatActivity() {
     private var tapCount = 0
     private var lastTapTime = 0L
 
+    // Kullanıcının istediği oynatma durumu: duraklatıldıysa video kilitleme, ekranın açılması
+    // gibi olaylarda kendiliğinden yeniden başlamaz
+    private var wantPlaying = true
+
+    // Güç tuşuyla ekran kapanınca video duraklatılır, açılınca saklanan konumdan devam eder
+    private var screenOff = false
+    private var savedPosition = -1
+
+    // Art arda açılamayan video sayısı (hepsi hata verirse sonsuz döngü önlenir)
+    private var consecutiveErrors = 0
+
+    // Kilit açıkken 30 sn dokunulmazsa çocuk kilidi kendiliğinden devreye girer
+    private val autoLockRunnable = Runnable {
+        if (isChildLocked || playlist.isEmpty()) return@Runnable
+        // Klasör seçici veya bir pencere açıksa kilitleme; süre dolunca yeniden dene
+        if (!hasWindowFocus()) {
+            scheduleAutoLock()
+            return@Runnable
+        }
+        toggleChildLock()
+        showInfo(AUTO_LOCKED_MSG)
+    }
+
     // Donanımsal/Sistem Düzeyinde Dokunma Bariyerleri (Status Bar & Nav Bar Bloklayıcılar)
     private var topBlockerView: View? = null
     private var bottomBlockerView: View? = null
@@ -144,14 +167,13 @@ class MainActivity : AppCompatActivity() {
                     cancelSleepCountdown()
                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     showInfo("🔌 Şarj Takıldı: Uyku İptal Edildi & Oynatılıyor")
-                    if (!videoView.isPlaying && playlist.isNotEmpty()) {
-                        videoView.start()
-                        updatePlayButton()
-                    }
+                    if (!videoView.isPlaying) play()
                 }
                 Intent.ACTION_POWER_DISCONNECTED -> {
                     start30SecSleepCountdown()
                 }
+                Intent.ACTION_SCREEN_OFF -> onScreenOff()
+                Intent.ACTION_SCREEN_ON -> onScreenOn()
             }
         }
     }
@@ -166,10 +188,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onFinish() {
                 showInfo("🔋 30 Sn Doldu: Derin Uykuya Geçiliyor")
-                if (videoView.isPlaying) {
-                    videoView.pause()
-                    updatePlayButton()
-                }
+                pauseVideo()
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 if (dpm.isAdminActive(adminComponent)) {
                     try {
@@ -353,7 +372,8 @@ class MainActivity : AppCompatActivity() {
         gesture = GestureDetector(this, GestureListener())
 
         // Kilit açıkken: normal hareketler + art arda 5 dokunuşla tekrar kilitleme
-        root.setOnTouchListener { view, event ->            if (registerUnlockTap(event)) {
+        root.setOnTouchListener { view, event ->
+            if (registerUnlockTap(event)) {
                 toggleChildLock()
                 return@setOnTouchListener true
             }
@@ -366,18 +386,33 @@ class MainActivity : AppCompatActivity() {
 
         videoView.setOnPreparedListener { mp ->
             mp.isLooping = false
-            videoView.start()
+            consecutiveErrors = 0
+            if (wantPlaying && !screenOff) videoView.start()
             updatePlayButton()
         }
         videoView.setOnCompletionListener { next() }
         videoView.setOnErrorListener { _, _, _ ->
-            next()
+            // Açılamayan videoyu atla. Sıradakine kısa gecikmeyle geçilir ki art arda hata veren
+            // videolar sonsuz bir zincire (ve çökmeye) yol açmasın.
+            consecutiveErrors++
+            if (consecutiveErrors < playlist.size) {
+                handler.postDelayed({ next() }, 300)
+            } else {
+                // Hiçbir video açılamıyor (örn. hafıza kartı henüz hazır değil): biraz sonra yeniden dene
+                showInfo("⚠️ Videolar oynatılamıyor\n10 saniye sonra yeniden denenecek")
+                handler.postDelayed({
+                    consecutiveErrors = 0
+                    next()
+                }, 10_000)
+            }
             true
         }
 
         val powerFilter = IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
         }
         registerReceiver(powerStateReceiver, powerFilter)
 
@@ -449,9 +484,17 @@ class MainActivity : AppCompatActivity() {
             // Odak bu pencerede olunca sistem çubuklarının gizlenmesi buradaki bayraklara göre yapılır
             isFocusableInTouchMode = true
             systemUiVisibility = IMMERSIVE_FLAGS
-            setOnKeyListener { _, keyCode, _ ->
-                // Ses tuşları çalışsın; Geri/Menü vb. yutulsun
-                keyCode != KeyEvent.KEYCODE_VOLUME_UP && keyCode != KeyEvent.KEYCODE_VOLUME_DOWN
+            setOnKeyListener { _, keyCode, event ->
+                when (keyCode) {
+                    // Ses tuşları sisteme bırakılır
+                    KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> false
+                    // Kumanda medya tuşları kilitliyken de çalışır; Geri/Menü vb. yutulur
+                    in MEDIA_KEYS -> {
+                        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) handleMediaKey(keyCode)
+                        true
+                    }
+                    else -> true
+                }
             }
             setOnTouchListener { _, event ->
                 if (registerUnlockTap(event)) {
@@ -535,10 +578,11 @@ class MainActivity : AppCompatActivity() {
                 Gravity.CENTER
             )
         )
-        // Yüzey yeniden oluşunca VideoView videoyu tekrar açar; bu konumdan oynatmaya devam eder
+        // Yüzey yeniden oluşunca VideoView videoyu tekrar açar; bu konumdan devam eder.
+        // Duraklatılmışsa duraklatılmış kalır.
         if (playlist.isNotEmpty()) {
             videoView.seekTo(position)
-            videoView.start()
+            if (wantPlaying && !screenOff) videoView.start()
         }
     }
 
@@ -671,33 +715,10 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
         }
-        when (keyCode) {
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                togglePlay()
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                if (!videoView.isPlaying) {
-                    videoView.start()
-                    updatePlayButton()
-                }
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                if (videoView.isPlaying) {
-                    videoView.pause()
-                    updatePlayButton()
-                }
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                next()
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                prev()
-                return true
-            }
+        // Kumanda / kulaklık medya tuşları kilitliyken de çalışır
+        if (keyCode in MEDIA_KEYS) {
+            if ((event?.repeatCount ?: 0) == 0) handleMediaKey(keyCode)
+            return true
         }
         return super.onKeyDown(keyCode, event)
     }
@@ -718,7 +739,7 @@ class MainActivity : AppCompatActivity() {
                             updatePlayButton()
                         }
                         AudioManager.AUDIOFOCUS_GAIN -> {
-                            if (!videoView.isPlaying && playlist.isNotEmpty()) {
+                            if (!videoView.isPlaying && wantPlaying && !screenOff && playlist.isNotEmpty()) {
                                 videoView.start()
                                 updatePlayButton()
                             }
@@ -745,6 +766,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        // Video bu ekrandaysa, ekran kapanınca oynatıcı kapanmadan önce konumu sakla
+        if (lockOverlay == null && videoView.duration > 0) savedPosition = videoView.currentPosition
         if (isChildLocked) closeSystemDialogs()
     }
 
@@ -755,10 +778,7 @@ class MainActivity : AppCompatActivity() {
             cancelSleepCountdown()
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             showInfo("🔌 Şarj Takıldı: Video Oynatılıyor")
-            if (!videoView.isPlaying && playlist.isNotEmpty()) {
-                videoView.start()
-                updatePlayButton()
-            }
+            if (!videoView.isPlaying) play()
         }
     }
 
@@ -1125,10 +1145,12 @@ class MainActivity : AppCompatActivity() {
         tapCount = 0
         updateLockBadge()
         if (isChildLocked) {
+            handler.removeCallbacks(autoLockRunnable)
             setControlsVisible(false)
             applyLockState()
             showInfo(LOCKED_MSG)
         } else {
+            scheduleAutoLock()
             applyLockState()
             // Kilitliyken video penceresinin altında Ana Ekran / Son Uygulamalar açılmış olabilir
             try {
@@ -1293,9 +1315,71 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun togglePlay() {
-        if (videoView.isPlaying) videoView.pause() else videoView.start()
+    private fun play() {
+        wantPlaying = true
+        if (playlist.isNotEmpty()) videoView.start()
         updatePlayButton()
+    }
+
+    private fun pauseVideo() {
+        wantPlaying = false
+        // Video henüz yükleniyorsa da duraklatılmış kalsın (yüklenince kendiliğinden başlamasın)
+        videoView.pause()
+        updatePlayButton()
+    }
+
+    private fun togglePlay() {
+        if (videoView.isPlaying) pauseVideo() else play()
+    }
+
+    private fun handleMediaKey(keyCode: Int) {
+        when (keyCode) {
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> togglePlay()
+            KeyEvent.KEYCODE_MEDIA_PLAY -> play()
+            KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_STOP -> pauseVideo()
+            KeyEvent.KEYCODE_MEDIA_NEXT -> next()
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS -> prev()
+        }
+    }
+
+    /**
+     * Güç tuşuyla ekran kapandı: video duraklatılır ve konumu saklanır. Kilitliyken video ayrı bir
+     * pencerede oynadığı için Android onu kendisi durdurmaz.
+     */
+    private fun onScreenOff() {
+        screenOff = true
+        // Oynatıcı hâlâ açıksa konumu buradan al; kapandıysa onPause'da saklanan konum kullanılır
+        if (videoView.duration > 0) savedPosition = videoView.currentPosition
+        videoView.pause()
+        updatePlayButton()
+    }
+
+    /** Ekran açıldı: video kaldığı yerden devam eder (duraklatılmışsa duraklatılmış kalır). */
+    private fun onScreenOn() {
+        screenOff = false
+        if (playlist.isEmpty()) return
+        if (savedPosition >= 0) {
+            videoView.seekTo(savedPosition)
+            savedPosition = -1
+        }
+        if (wantPlaying) videoView.start()
+        updatePlayButton()
+    }
+
+    private fun scheduleAutoLock() {
+        handler.removeCallbacks(autoLockRunnable)
+        if (!isChildLocked) handler.postDelayed(autoLockRunnable, AUTO_LOCK_DELAY_MS)
+    }
+
+    // Kilit açıkken her dokunuş ve tuş, otomatik kilit süresini yeniden başlatır
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (!isChildLocked) scheduleAutoLock()
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (!isChildLocked) scheduleAutoLock()
+        return super.dispatchKeyEvent(event)
     }
 
     private fun updatePlayButton() {
@@ -1381,6 +1465,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playCurrent() {
+        wantPlaying = true
+        savedPosition = -1
         videoView.setVideoURI(playlist[index])
         videoView.requestFocus()
         if (::txtTitle.isInitialized && index < playlistNames.size) {
@@ -1436,6 +1522,19 @@ class MainActivity : AppCompatActivity() {
         private const val UNLOCK_TAP_COUNT = 5
         private const val TAP_INTERVAL_MS = 500L
         private const val LOCKED_MSG = "🔒 Çocuk Kilidi AKTİF\n(Açmak için art arda 5 kez dokunun)"
+        private const val AUTO_LOCK_DELAY_MS = 30_000L
+        private const val AUTO_LOCKED_MSG = "🔒 30 sn dokunulmadı\nÇocuk Kilidi otomatik AKTİF"
+
+        // Kumanda / kulaklık medya tuşları (kilitliyken de çalışır)
+        private val MEDIA_KEYS = setOf(
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_STOP,
+            KeyEvent.KEYCODE_MEDIA_NEXT,
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            KeyEvent.KEYCODE_HEADSETHOOK
+        )
 
         @Suppress("DEPRECATION")
         private const val IMMERSIVE_FLAGS = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or

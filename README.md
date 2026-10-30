@@ -25,6 +25,10 @@ Proje iki ayrı uygulamadan oluşur:
   - 🔌 Şarj takılınca ekran açılır ve video kaldığı yerden devam eder.
   - 🔋 Şarj çıkarılınca 30 saniyelik geri sayım başlar; süre dolunca video durur ve ekran kapanır (cihaz yöneticisi yetkisi gerekir).
 - **Ekran açık kalır**, kilit ekranının üstünde de görüntülenir.
+- **Güç tuşu:** Güç tuşuna kısa basılıp ekran kapatılınca video duraklar; ekran açılınca kaldığı yerden devam eder.
+- **Kumanda / kulaklık desteği:** Bluetooth/USB kumanda veya kulaklıktaki medya tuşları
+  (oynat/duraklat, sonraki, önceki, durdur) **çocuk kilidi aktifken de** çalışır.
+- **Duraklatma kalıcıdır:** Duraklatılan video; kilitlendiğinde, ekran açıldığında veya pencere değiştiğinde kendiliğinden başlamaz.
 - **🔒 Çocuk kilidi** (ayrıntılar aşağıda).
 - **Kontroller (kilit açıkken):** oynat/duraklat, önceki/sonraki video, ilerleme çubuğu, ses ve parlaklık düğmeleri, klasör değiştirme.
 - **Hareketler (kilit açıkken):** ekranın sol/sağ yarısına çift dokunma = önceki/sonraki video;
@@ -41,6 +45,7 @@ Uygulama **kilitli başlar**. Kilit aktifken:
 - Ekrana yapılan dokunmalar, kaydırmalar ve çift dokunmalar **hiçbir şey yapmaz** (sadece "Çocuk Kilidi AKTİF" yazısı görünür).
 - **Geri ◁**, **Ana Ekran ○** ve **Son Uygulamalar ▢** tuşları videoyu kapatamaz.
 - Bildirim paneli kapatılır.
+- Kumandanın medya tuşları ve ses tuşları çalışmaya devam eder.
 
 ### Kilidi açmak
 Ekrana **art arda 5 kez** hızlıca dokunun (dokunuşlar arası en fazla yarım saniye). Kilit açılınca kontroller görünür.
@@ -49,6 +54,11 @@ Birden fazla parmakla dokunma sayılmaz, böylece çocuğun avuç içiyle basmas
 ### Tekrar kilitlemek
 Kilit açıkken sağ üstteki **"🔓 Kilitle"** düğmesine dokunun (kontroller gizliyse önce bir kez ekrana dokunup gösterin)
 ya da ekrana art arda 5 kez dokunun.
+
+### Otomatik kilit
+Kilit açıkken ekrana veya kumandaya **30 saniye** dokunulmazsa çocuk kilidi kendiliğinden devreye girer
+("30 sn dokunulmadı" yazısı görünür). Her dokunuş ya da tuş bu süreyi yeniden başlatır.
+Klasör seçici veya başka bir pencere açıkken otomatik kilit beklemeye alınır.
 
 ### Nasıl çalışıyor?
 | | Android 4+ sürümü | Android 8+ sürümü |
@@ -108,6 +118,21 @@ Uygulama **internet izni istemez**; hiçbir veri toplamaz veya göndermez.
   kullanın: hareketle gezinmede **alttan yukarı kaydırıp basılı tutun**; 3 düğmeli gezinmede **Geri ve Son Uygulamalar'a birlikte basılı tutun**.
 - **Android 8+:** "Diğer uygulamaların üzerinde göster" izni verilmezse kilit, ekran sabitleme ve dokunma engeliyle çalışmaya devam eder.
 - Android 12 ve üstünde uygulamalar bildirim panelini kendileri kapatamaz; bu sürümlerde paneli ekran sabitleme engeller.
+
+---
+
+## 📝 Sürüm geçmişi
+
+### v1.1
+- Güç tuşuyla ekran kapatılınca video artık arka planda oynamaya devam etmiyor; ekran açılınca kaldığı yerden devam ediyor.
+- Kumanda medya tuşları çocuk kilidi aktifken de çalışıyor.
+- Duraklatılan video, çocuk kilidi tekrar açıldığında kendiliğinden başlamıyor.
+- Yeni: Kilit açıkken 30 saniye dokunulmazsa çocuk kilidi otomatik olarak devreye giriyor.
+- Düzeltme: Video yüklenirken duraklatılırsa yüklenince kendiliğinden başlamıyor.
+- Düzeltme: Hiçbir video açılamadığında (örn. hafıza kartı hazır değilken) uygulama çökmüyor; 10 saniye sonra yeniden deniyor.
+
+### v1.0
+- İlk sürüm: sürekli video döngüsü, çocuk kilidi (5 dokunuşla açma), şarj davranışı, açılışta başlama.
 
 ---
 
