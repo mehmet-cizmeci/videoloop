@@ -479,23 +479,28 @@ class MainActivity : AppCompatActivity() {
     private fun showLockOverlay(): Boolean {
         if (lockOverlay != null) return true
 
-        val overlay = FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
-            // Odak bu pencerede olunca sistem çubuklarının gizlenmesi buradaki bayraklara göre yapılır
-            isFocusableInTouchMode = true
-            systemUiVisibility = IMMERSIVE_FLAGS
-            setOnKeyListener { _, keyCode, event ->
-                when (keyCode) {
+        // Tuşlar, odak hangi alt görünümde olursa olsun (örn. video değişince VideoView odağı alır)
+        // önce burada yakalanır; yoksa medya tuşları başka uygulamalara (Google Müzik vb.) gider
+        val overlay = object : FrameLayout(this) {
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                return when (event.keyCode) {
                     // Ses tuşları sisteme bırakılır
-                    KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> false
+                    KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> super.dispatchKeyEvent(event)
                     // Kumanda medya tuşları kilitliyken de çalışır; Geri/Menü vb. yutulur
                     in MEDIA_KEYS -> {
-                        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) handleMediaKey(keyCode)
+                        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                            handleMediaKey(event.keyCode)
+                        }
                         true
                     }
                     else -> true
                 }
             }
+        }.apply {
+            setBackgroundColor(Color.BLACK)
+            // Odak bu pencerede olunca sistem çubuklarının gizlenmesi buradaki bayraklara göre yapılır
+            isFocusableInTouchMode = true
+            systemUiVisibility = IMMERSIVE_FLAGS
             setOnTouchListener { _, event ->
                 if (registerUnlockTap(event)) {
                     toggleChildLock()

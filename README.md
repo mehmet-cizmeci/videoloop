@@ -123,6 +123,10 @@ Uygulama **internet izni istemez**; hiçbir veri toplamaz veya göndermez.
 
 ## 📝 Sürüm geçmişi
 
+### v1.2
+- Android 4.4: Kumandanın medya tuşları, kumandayla video değiştirildikten sonra da çalışıyor (önceki sürümde tuşlar başka uygulamalara gidebiliyordu).
+- HP Slate 7 HD tablette test edildi.
+
 ### v1.1
 - Güç tuşuyla ekran kapatılınca video artık arka planda oynamaya devam etmiyor; ekran açılınca kaldığı yerden devam ediyor.
 - Kumanda medya tuşları çocuk kilidi aktifken de çalışıyor.
