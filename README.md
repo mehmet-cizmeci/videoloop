@@ -77,7 +77,12 @@ Klasör seçici veya başka bir pencere açıkken otomatik kilit beklemeye alın
    Android 4.4: *Ayarlar → Güvenlik → Bilinmeyen kaynaklar*).
 3. APK'yı açıp yükleyin.
 
-> APK'lar Android'in hata ayıklama (debug) anahtarıyla imzalıdır. Google Play'de değildir; Play Protect bir uyarı gösterebilir.
+> **İmza:** v1.2 ve önceki APK'lar Android'in hata ayıklama (debug) anahtarıyla imzalıdır. Sonraki sürümden (v1.3) itibaren
+> APK'lar kalıcı **yayın anahtarıyla** imzalanır; bundan sonraki tüm sürümler birbirinin üzerine güncelleme olarak kurulabilir.
+> Cihazınızda v1.2 veya öncesi varsa, v1.3'ü kurmadan önce eski uygulamayı **bir kez kaldırın** (imza değiştiği için Android
+> "Uygulama yüklenmedi" der). Yayın sertifikası SHA-256 parmak izi:
+> `d5:b4:81:9f:d5:03:7c:74:fa:4b:17:19:08:4d:b9:6b:00:cd:d2:ed:2d:67:af:bb:50:e3:0a:c0:55:b3:10:e3`
+> ([doğrulama ve ayrıntılar](docs/IMZALAMA.md)). Uygulama Google Play'de değildir; Play Protect bir uyarı gösterebilir.
 
 ### İlk açılışta
 1. **Sistem optimizasyonu** sorusuna Evet/Hayır deyin.
@@ -153,6 +158,16 @@ cd videoloop
 APK'lar şu klasörlerde oluşur:
 - `app/build/outputs/apk/debug/app-debug.apk` (Android 8+)
 - `app_legacy/build/outputs/apk/debug/app_legacy-debug.apk` (Android 4.4+)
+
+Yayın (release) APK'ları için:
+
+```bash
+./gradlew assembleRelease
+```
+
+Çıktılar `app/build/outputs/apk/release/` ve `app_legacy/build/outputs/apk/release/` klasörlerindedir. Yayın anahtarı
+(`%USERPROFILE%\.imza\videoloop-imza.properties`) bilgisayarda varsa APK'lar onunla, yoksa debug anahtarıyla imzalanır.
+Anahtar ve parolalar depoda **bulunmaz**. Ayrıntılar: [Dijital İmza Rehberi](docs/IMZALAMA.md).
 
 ### Proje yapısı
 ```
