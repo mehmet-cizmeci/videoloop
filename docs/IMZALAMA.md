@@ -1,14 +1,20 @@
 # 🔏 Dijital İmza (Kod İmzalama) Rehberi
 
-Bu rehber **mehmet-cizmeci** hesabındaki açık kaynak uygulamaların nasıl imzalandığını anlatır. Üç projede de aynıdır:
+Bu rehber **mehmet-cizmeci** hesabındaki açık kaynak uygulamaların imza durumunu anlatır. Üç projede de aynıdır.
 
-| Proje | Platform | İmza türü |
+## Güncel durum
+
+| Proje | Platform | İmza |
 |---|---|---|
-| [video-muzik-indirici](https://github.com/mehmet-cizmeci/video-muzik-indirici) | Windows (exe) | Authenticode — Certum bulut sertifikası |
-| [Disci](https://github.com/mehmet-cizmeci/Disci) | Windows (exe + kurulum betikleri) | Authenticode — Certum bulut sertifikası |
-| [videoloop](https://github.com/mehmet-cizmeci/videoloop) | Android (apk) | Android yayın anahtarı (keystore) |
+| [video-muzik-indirici](https://github.com/mehmet-cizmeci/video-muzik-indirici) | Windows (exe) | **İmzasız** — Windows ilk açılışta SmartScreen uyarısı gösterebilir |
+| [Disci](https://github.com/mehmet-cizmeci/Disci) | Windows (exe + kurulum betikleri) | **İmzasız** — Windows ilk açılışta SmartScreen uyarısı gösterebilir |
+| [videoloop](https://github.com/mehmet-cizmeci/videoloop) | Android (apk) | **İmzalı** — kalıcı Android yayın anahtarı (v1.3 ve sonrası) |
 
-Kod imzalama sertifikası projeye değil **kişiye** verilir: tek bir Certum sertifikası iki Windows projesini de imzalar. Android uygulamaları ise Windows sertifikası kullanmaz; kendi anahtar deposuyla imzalanır.
+**Windows uygulamaları neden imzasız?** Windows'un tanıdığı kod imzalama sertifikaları ücretlidir (en ucuzu, açık kaynak projeler için bile yıllık ücretlidir). Bu projelerin gelir beklentisi olmadığından sertifika alınmadı. Uygulamalar imzasız da güvenle çalışır; kaynak kodun tamamı depodadır ve isteyen exe'yi kendisi derleyebilir. SmartScreen uyarısında **Ek bilgi → Yine de çalıştır** ile devam edilir.
+
+**Android imzası ücretsizdir:** geliştiricinin kendi oluşturduğu anahtarla yapılır ve videoloop'ta kullanılmaktadır.
+
+İmzalama altyapısı (`imzala.ps1`) depolarda hazır durur: ileride bir sertifika edinilirse (ücretli bir sertifika veya [SignPath Foundation](https://signpath.org/) gibi ücretsiz bir açık kaynak programı) derleme komutları dosyaları kendiliğinden imzalar. Sertifika yokken betik dosyaları imzasız bırakır ve derleme normal şekilde tamamlanır. Aşağıdaki Windows bölümleri bu durum için başvuru bilgisidir.
 
 ## İçindekiler
 
@@ -35,7 +41,9 @@ Kod imzalama sertifikası projeye değil **kişiye** verilir: tek bir Certum ser
 
 ## Windows: Certum bulut sertifikası almak
 
-**Ürün:** Certum *Open Source Code Signing in the Cloud* (SimplySign). Bireysel açık kaynak geliştiriciler içindir; şirket gerekmez. Fiyat ve koşullar için Certum mağazasını kontrol edin.
+> Bu bölüm başvuru bilgisidir; şu an bu projeler için sertifika **alınmamıştır** (bkz. [Güncel durum](#güncel-durum)).
+
+**Ürün:** Certum *Open Source Code Signing in the Cloud* (SimplySign). Bireysel açık kaynak geliştiriciler içindir; şirket gerekmez. **Ücretlidir** (Kasım 2026'da 49 €); güncel fiyat ve koşullar için Certum mağazasını kontrol edin.
 
 1. **Satın alma:** Certum mağazasından *Open Source Code Signing* ürününün **bulut (SimplySign)** seçeneğini alın. Kart okuyuculu seçeneği almanıza gerek yok.
 2. **Hesap ve başvuru formu:** Ad soyadınızı kimliğinizdeki gibi yazın (sertifikada ve Windows'un uyarı penceresinde bu ad görünecek). "Proje adresi" olarak açık kaynak depolardan birini verin, ör. `https://github.com/mehmet-cizmeci/video-muzik-indirici`.
