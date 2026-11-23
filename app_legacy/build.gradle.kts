@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.videoloop.legacy"
         minSdk = 19
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2-legacy"
+        versionCode = 4
+        versionName = "1.3-legacy"
     }
 
     // Yayın imzası: anahtar ve parolalar depo dışında (%USERPROFILE%\.imza\videoloop-imza.properties,

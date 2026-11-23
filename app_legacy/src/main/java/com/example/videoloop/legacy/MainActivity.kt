@@ -29,6 +29,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
@@ -529,7 +530,10 @@ class MainActivity : AppCompatActivity() {
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            PixelFormat.OPAQUE
+            // Saydamlık destekli olmalı: video (SurfaceView) pencerenin altındaki katmanda çizilir ve
+            // pencerede açılan saydam delikten görünür. OPAQUE olursa bazı cihazlarda (örn. MediaTek)
+            // video siyahla örtülür, sadece ses gelir.
+            PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.LEFT
         }
@@ -1141,7 +1145,12 @@ class MainActivity : AppCompatActivity() {
                 colors = intArrayOf(Color.argb(220, 0, 0, 0), Color.TRANSPARENT)
             }
             addView(progressRow)
-            addView(buttonsRow)
+            // Dar ekranlarda (örn. 360 dp telefonlar) düğmeler sığmazsa yana kaydırılabilir
+            addView(HorizontalScrollView(this@MainActivity).apply {
+                isFillViewport = true
+                isHorizontalScrollBarEnabled = false
+                addView(buttonsRow)
+            })
         }
     }
 

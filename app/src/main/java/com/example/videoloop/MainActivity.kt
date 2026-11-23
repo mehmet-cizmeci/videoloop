@@ -17,6 +17,7 @@ import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.GestureDetector
@@ -28,6 +29,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
@@ -38,7 +40,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.documentfile.provider.DocumentFile
 import java.util.Locale
 import kotlin.math.abs
 
@@ -208,15 +209,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val pickFolder = registerForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
+    // Android 8-9'da klasör seçici dahili depolamayı varsayılan olarak gizleyebilir; görünür yap
+    private val pickFolder = registerForActivityResult(object : ActivityResultContracts.OpenDocumentTree() {
+        override fun createIntent(context: Context, input: Uri?): Intent =
+            super.createIntent(context, input).putExtra(EXTRA_SHOW_ADVANCED, true)
+    }) { uri ->
         if (uri != null) {
-            contentResolver.takePersistableUriPermission(
-                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+            try {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             prefs.edit().putString("folder", uri.toString()).apply()
             startPlayback()
+        }
+    }
+
+    /** Klasör seçiciyi son seçilen klasörde açar (ilk seferde varsayılan konumda). */
+    private fun launchFolderPicker() {
+        val initial = prefs.getString("folder", null)?.let {
+            try {
+                val tree = Uri.parse(it)
+                DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+            } catch (e: Exception) {
+                null
+            }
+        }
+        try {
+            pickFolder.launch(initial)
+        } catch (e: Exception) {
+            // Bazı cihazlar başlangıç konumunu kabul etmez; konumsuz aç
+            pickFolder.launch(null)
         }
     }
 
@@ -256,7 +279,8 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             textSize = 20f
             gravity = Gravity.CENTER
-            setPadding(40, 0, 40, 100)
+            // Alt boşluk: uzun uyarılar ortadaki "Video Klasörü Seç" düğmesinin üstüne binmesin
+            setPadding(dp(24), 0, dp(24), dp(150))
         }
         root.addView(
             statusText,
@@ -329,7 +353,7 @@ class MainActivity : AppCompatActivity() {
                 cornerRadius = dp(24).toFloat()
             }
             setPadding(dp(24), dp(12), dp(24), dp(12))
-            setOnClickListener { pickFolder.launch(null) }
+            setOnClickListener { launchFolderPicker() }
         }
         root.addView(
             selectButton,
@@ -623,7 +647,10 @@ class MainActivity : AppCompatActivity() {
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            PixelFormat.OPAQUE
+            // Saydamlık destekli olmalı: video (SurfaceView) pencerenin altındaki katmanda çizilir ve
+            // pencerede açılan saydam delikten görünür. OPAQUE olursa bazı cihazlarda (örn. MediaTek)
+            // video siyahla örtülür, sadece ses gelir.
+            PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.LEFT
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -926,7 +953,7 @@ class MainActivity : AppCompatActivity() {
         val btnBrightDown = createModernButton("☀−", sizeDp = 52, textSizeSp = 20f) { adjustBrightness(-0.1f) }
         val btnBrightUp = createModernButton("☀+", sizeDp = 52, textSizeSp = 20f) { adjustBrightness(0.1f) }
         val btnOpt = createModernButton("⚡", sizeDp = 52, textSizeSp = 20f) { performSystemOptimization() }
-        val btnFolder = createModernButton("📁", sizeDp = 52, textSizeSp = 22f) { pickFolder.launch(null) }
+        val btnFolder = createModernButton("📁", sizeDp = 52, textSizeSp = 22f) { launchFolderPicker() }
 
         val buttonsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -948,7 +975,12 @@ class MainActivity : AppCompatActivity() {
                 colors = intArrayOf(Color.argb(220, 0, 0, 0), Color.TRANSPARENT)
             }
             addView(progressRow)
-            addView(buttonsRow)
+            // Dar ekranlarda (örn. 360 dp telefonlar) düğmeler sığmazsa yana kaydırılabilir
+            addView(HorizontalScrollView(this@MainActivity).apply {
+                isFillViewport = true
+                isHorizontalScrollBarEnabled = false
+                addView(buttonsRow)
+            })
         }
     }
 
@@ -1196,20 +1228,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun startPlayback() {
         val folderUri = prefs.getString("folder", null)?.let { Uri.parse(it) } ?: return
-        val dir = DocumentFile.fromTreeUri(this, folderUri) ?: return
-        val files = dir.listFiles().filter { it.isFile && isVideo(it) }
-        if (files.isEmpty()) {
+        val videos = listVideos(folderUri)
+        if (videos.isNullOrEmpty()) {
             selectButton.visibility = View.VISIBLE
             statusText.visibility = View.VISIBLE
-            statusText.text = "Seçilen klasörde video bulunamadı"
+            statusText.text = if (videos == null) {
+                "Seçilen klasör okunamadı.\nKlasördeki bazı dosya adlarında bozuk karakter (örn. emoji) olabilir. " +
+                        "Bu dosyaların adını değiştirip klasörü yeniden seçin."
+            } else {
+                "Seçilen klasörde video bulunamadı"
+            }
             applyLockState()
             return
         }
         playlist.clear()
         playlistNames.clear()
-        files.shuffled().forEach {
-            playlist.add(it.uri)
-            playlistNames.add(it.name ?: "Video")
+        videos.shuffled().forEach { (uri, name) ->
+            playlist.add(uri)
+            playlistNames.add(name)
         }
         index = 0
         selectButton.visibility = View.GONE
@@ -1219,10 +1255,40 @@ class MainActivity : AppCompatActivity() {
         if (!isChildLocked) setControlsVisible(true) else showInfo(LOCKED_MSG)
     }
 
-    private fun isVideo(file: DocumentFile): Boolean {
-        val type = file.type ?: ""
-        val name = file.name?.lowercase() ?: ""
-        return type.startsWith("video/") || name.endsWith(".mp4") || name.endsWith(".mkv") || name.endsWith(".3gp") || name.endsWith(".webm") || name.endsWith(".mov") || name.endsWith(".avi")
+    /**
+     * Klasördeki videoları tek sorguyla listeler (çok sayıda dosyada dosya başına sorgu yapmaktan
+     * çok daha hızlıdır). Klasör okunamazsa null döner: Android 8.1'de adı bozuk kodlanmış tek bir
+     * dosya bile bütün klasörün listelenmesini engelleyebilir.
+     */
+    private fun listVideos(tree: Uri): List<Pair<Uri, String>>? {
+        return try {
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+            val columns = arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE
+            )
+            contentResolver.query(children, columns, null, null, null)?.use { c ->
+                val result = mutableListOf<Pair<Uri, String>>()
+                while (c.moveToNext()) {
+                    val name = c.getString(1) ?: continue
+                    val mime = c.getString(2) ?: ""
+                    if (mime != DocumentsContract.Document.MIME_TYPE_DIR && isVideo(name, mime)) {
+                        result.add(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)) to name)
+                    }
+                }
+                result
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun isVideo(name: String, mime: String): Boolean {
+        val n = name.lowercase(Locale.ROOT)
+        return mime.startsWith("video/") || n.endsWith(".mp4") || n.endsWith(".mkv") || n.endsWith(".3gp") ||
+                n.endsWith(".webm") || n.endsWith(".mov") || n.endsWith(".avi")
     }
 
     private fun playCurrent() {
@@ -1282,6 +1348,9 @@ class MainActivity : AppCompatActivity() {
         private const val UNLOCK_TAP_COUNT = 5
         private const val TAP_INTERVAL_MS = 500L
         private const val LOCKED_MSG = "🔒 Çocuk Kilidi AKTİF\n(Açmak için art arda 5 kez dokunun)"
+
+        // Klasör seçicide dahili depolamayı göster (resmî olmayan ama yaygın desteklenen ek)
+        private const val EXTRA_SHOW_ADVANCED = "android.content.extra.SHOW_ADVANCED"
         private const val AUTO_LOCK_DELAY_MS = 30_000L
         private const val AUTO_LOCKED_MSG = "🔒 30 sn dokunulmadı\nÇocuk Kilidi otomatik AKTİF"
 

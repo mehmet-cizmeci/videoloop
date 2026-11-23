@@ -112,6 +112,29 @@ Uygulama **internet izni istemez**; hiçbir veri toplamaz veya göndermez.
 
 ---
 
+## 🎞️ Video biçimleri (önemli)
+
+Video Döngü, videoları cihazın **kendi video çözücüsüyle** oynatır. Cihaz bir videonun biçimini çözemiyorsa
+**ses gelir ama görüntü gelmez** (ekran siyah kalır). Bu durum uygulamadan değil, videonun biçiminden kaynaklanır.
+
+- **AV1:** YouTube son yıllarda videoları çoğunlukla AV1 biçiminde sunuyor. **Android 9 ve öncesi AV1 oynatamaz.**
+- **1080p ve 60 fps:** Eski ve düşük güçlü cihazlar (ör. MediaTek MT6737 işlemcili telefonlar, eski tabletler)
+  1080p'yi veya 60 fps'i kaldıramayabilir.
+- **Her cihazda çalışan biçim:** **H.264 (MP4), en fazla 720p, en fazla 30 fps, AAC ses.**
+
+Videoları YouTube'dan indiriyorsanız indiricide **H.264 / MP4 ve 720p** seçin. Elinizdeki videoları dönüştürmek için
+ücretsiz [ffmpeg](https://ffmpeg.org/) ile:
+
+```bash
+ffmpeg -i girdi.mp4 -map 0:v:0 -map 0:a:0? -vf "scale=-2:'min(720,ih)',fps=30,format=yuv420p" -c:v libx264 -profile:v main -level 3.1 -preset veryfast -crf 23 -c:a aac -b:a 128k -movflags +faststart cikti.mp4
+```
+
+**Dosya adlarında emoji:** Android 4.4 cihazlarda indirilen bazı dosyaların adındaki emojiler bozuk kodlanabiliyor ve
+Android 8.1, böyle tek bir dosya yüzünden bütün klasörü listeleyemiyor (klasör seçicide "İçerik şu anda yüklenemiyor").
+Bu durumda o dosyaların adından emojileri silin.
+
+---
+
 ## ⚠️ Bilinen sınırlamalar
 
 - **Android 4.4:** Alttan yukarı kaydırınca alttaki 3 sistem düğmesi bir an görünebilir; Android 4.4 normal bir uygulamanın
@@ -127,6 +150,15 @@ Uygulama **internet izni istemez**; hiçbir veri toplamaz veya göndermez.
 ---
 
 ## 📝 Sürüm geçmişi
+
+### v1.3
+- APK'lar artık kalıcı yayın anahtarıyla imzalı (bkz. [Kurulum](#-kurulum); v1.2'den geçerken eski uygulamayı bir kez kaldırın).
+- Düzeltme: Bazı cihazlarda (ör. MediaTek işlemcili telefonlar) çocuk kilidi aktifken **ses gelip görüntü gelmemesi** giderildi.
+- Video klasörü tek sorguyla listeleniyor; 50+ videolu klasörler çok daha hızlı açılıyor.
+- Klasör okunamazsa "video bulunamadı" yerine nedenini anlatan bir uyarı gösteriliyor.
+- Android 8+: Klasör seçici dahili depolamayı gösterecek ve son seçilen klasörde açılacak şekilde başlatılıyor.
+- Dar ekranlı telefonlarda alttaki düğme sırası artık yana kaydırılabiliyor (📁 klasör düğmesi ekran dışında kalmıyor).
+- README'ye "Video biçimleri" bölümü eklendi (AV1 / 1080p / 60 fps uyarısı).
 
 ### v1.2
 - Android 4.4: Kumandanın medya tuşları, kumandayla video değiştirildikten sonra da çalışıyor (önceki sürümde tuşlar başka uygulamalara gidebiliyordu).
