@@ -11,6 +11,9 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
+import android.media.MediaMetadata
+import android.media.session.MediaSession
+import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -20,6 +23,7 @@ import android.os.Looper
 import android.provider.DocumentsContract
 import android.provider.Settings
 import android.text.TextUtils
+import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
@@ -37,6 +41,7 @@ import android.widget.VideoView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -93,6 +98,12 @@ class MainActivity : AppCompatActivity() {
     // "Diğer uygulamaların üzerinde göster" izni bu oturumda bir kez istensin
     private var overlayPermissionAsked = false
 
+    // Ekran sabitleme bir kez istendi mi (bkz. startScreenPinning)
+    private var pinRequested = false
+
+    // Araç / Bluetooth kulaklık / kumanda komutları ve araç ekranındaki video bilgisi için medya oturumu
+    private var mediaSession: MediaSession? = null
+
     // Uygulama bağlamından alınır: Activity arka plana geçse de üst pencere gizlenmez
     private val windowManagerService by lazy { applicationContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
 
@@ -101,8 +112,9 @@ class MainActivity : AppCompatActivity() {
             if (isChildLocked) {
                 hideSystemBars()
                 collapseStatusBar()
-                // Odak başka bir yerdeyse (bildirim paneli, Son Uygulamalar) onları kapat
-                if (!hasWindowFocus()) closeSystemDialogs()
+                // Odak başka bir yerdeyse (bildirim paneli, Son Uygulamalar) onları kapat. Android 8'de
+                // ekran sabitleme onay penceresi açıksa kapatma: kullanıcı "Anladım"a basabilmeli
+                if (!hasWindowFocus() && !pinConfirmPending()) closeSystemDialogs()
                 handler.postDelayed(this, 300)
             }
         }
@@ -124,6 +136,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var txtTitle: TextView
     private lateinit var lockBadge: TextView
     private lateinit var btnPlay: TextView
+    private lateinit var btnPrev: TextView
+    private lateinit var btnNext: TextView
     private lateinit var btnMute: TextView
     private lateinit var seekBar: SeekBar
     private lateinit var txtTime: TextView
@@ -312,6 +326,13 @@ class MainActivity : AppCompatActivity() {
         )
 
         topBar = buildTopBar()
+        // Üst ve alt çubuk, görünür olduklarında sistem çubuklarının (saat, gezinme) altında kalmasın
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            val bars = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars())
+            topBar.setPadding(dp(20) + bars.left, dp(12) + bars.top, dp(20) + bars.right, dp(20))
+            bottomBar.setPadding(dp(16) + bars.left, dp(16), dp(16) + bars.right, dp(16) + bars.bottom)
+            insets
+        }
         root.addView(
             topBar,
             FrameLayout.LayoutParams(
@@ -386,6 +407,13 @@ class MainActivity : AppCompatActivity() {
         )
 
         setContentView(root)
+
+        // Ortadaki düğmeler ekranın kısa kenarına göre ölçeklenir (yatay / dikey değişince yeniden)
+        root.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or_, ob ->
+            if (r - l != or_ - ol || b - t != ob - ot) root.post { resizeCenterControls(r - l, b - t) }
+        }
+
+        setupMediaSession()
 
         gesture = GestureDetector(this, GestureListener())
 
@@ -473,6 +501,71 @@ class MainActivity : AppCompatActivity() {
                 AudioManager.STREAM_MUSIC,
                 AudioManager.AUDIOFOCUS_GAIN
             )
+        }
+    }
+
+    /**
+     * Araç multimedya sistemi, Bluetooth kulaklık ve kumandalar komutlarını (oynat, duraklat, sonraki,
+     * önceki) Android'in medya oturumu üzerinden gönderir. Oturum yoksa ses araca gider ama komutlar
+     * uygulamaya ulaşmaz. Oturum çocuk kilidi aktifken de çalışır.
+     */
+    private fun setupMediaSession() {
+        try {
+            val session = MediaSession(this, "VideoDongu")
+            session.setCallback(object : MediaSession.Callback() {
+                override fun onPlay() = play()
+                override fun onPause() = pauseVideo()
+                override fun onStop() = pauseVideo()
+                override fun onSkipToNext() = next()
+                override fun onSkipToPrevious() = prev()
+                override fun onSeekTo(pos: Long) {
+                    if (videoView.duration > 0) videoView.seekTo(pos.toInt())
+                    updateMediaSession()
+                }
+            })
+            @Suppress("DEPRECATION")
+            session.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
+            session.isActive = true
+            mediaSession = session
+            updateMediaSession()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /** Oynatma durumunu ve video adını medya oturumuna (araç ekranına) bildirir. */
+    private fun updateMediaSession() {
+        val session = mediaSession ?: return
+        try {
+            val playing = videoView.isPlaying
+            val position = if (videoView.duration > 0) videoView.currentPosition.toLong() else 0L
+            session.setPlaybackState(
+                PlaybackState.Builder()
+                    .setActions(
+                        PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or
+                                PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_STOP or
+                                PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                                PlaybackState.ACTION_SEEK_TO
+                    )
+                    .setState(
+                        if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
+                        position, if (playing) 1f else 0f
+                    )
+                    .build()
+            )
+            val title = playlistNames.getOrNull(index)?.substringBeforeLast('.') ?: "Video Döngü"
+            session.setMetadata(
+                MediaMetadata.Builder()
+                    .putString(MediaMetadata.METADATA_KEY_TITLE, title)
+                    .putString(MediaMetadata.METADATA_KEY_ARTIST, "Video Döngü")
+                    .putString(MediaMetadata.METADATA_KEY_ALBUM, "Video Döngü")
+                    .putLong(MediaMetadata.METADATA_KEY_DURATION, maxOf(videoView.duration, 0).toLong())
+                    .putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, (index + 1).toLong())
+                    .putLong(MediaMetadata.METADATA_KEY_NUM_TRACKS, playlist.size.toLong())
+                    .build()
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -608,10 +701,11 @@ class MainActivity : AppCompatActivity() {
             showLockOverlay()
             handler.post(barSuppressionRunnable)
         } else {
-            // Sabitleme bilerek kaldırılmaz: her kilitte yeniden sabitlemek geçiş sırasında dokunuşları
-            // kaybettiriyor. Uygulamadan çıkmak için Android'in kendi hareketi kullanılır
-            // (alttan yukarı kaydırıp basılı tutma / Geri + Son Uygulamalar'a birlikte basılı tutma).
+            // Sabitleme burada kaldırılmaz: her kilitte yeniden istemek "Uygulama sabitlendi" penceresini
+            // tekrar tekrar açar. Kilit açıkken üst çubuktaki Çıkış / Ayarlar düğmeleri sabitlemeyi kaldırır.
             hideLockOverlay()
+            // Kullanıcı sabitlemeyi reddettiyse bir sonraki kilitte yeniden sorulsun
+            if (!isScreenPinned()) pinRequested = false
         }
     }
 
@@ -731,10 +825,36 @@ class MainActivity : AppCompatActivity() {
         return am.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE
     }
 
+    /**
+     * Ekran sabitleme her istekte ekranın yarısını kaplayan "Uygulama sabitlendi" penceresi açar
+     * (Hayır, teşekkürler / Anladım). Bu yüzden:
+     * - Android 8–11'de tam ekran video penceresi (üstte gösterme izni) varken sabitleme kullanılmaz:
+     *   pencere Ana ekran ve Son uygulamaların üstünde durur, bildirim paneli de kapatılabilir.
+     * - Android 12+'da (panel video penceresinin üstüne çekilebildiği için) ya da izin yoksa sabitleme
+     *   kullanılır, ama yalnızca bir kez istenir ve kilit açılıp kapandıkça yeniden istenmez.
+     *   Sabitleme yalnızca Çıkış ve Telefon ayarları ile kaldırılır.
+     */
+    private fun usePinning(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || !Settings.canDrawOverlays(this)
+
+    /** Sabitleme penceresi ekrandayken sistem pencereleri kapatılmaz; kullanıcı yanıt verebilsin. */
+    private fun pinConfirmPending(): Boolean = pinRequested && !isScreenPinned()
+
     private fun startScreenPinning() {
-        if (isScreenPinned()) return
+        if (isScreenPinned() || !usePinning() || pinRequested) return
+        pinRequested = true
         try {
             startLockTask()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun stopScreenPinning() {
+        pinRequested = false
+        if (!isScreenPinned()) return
+        try {
+            stopLockTask()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -888,15 +1008,157 @@ class MainActivity : AppCompatActivity() {
                 colors = intArrayOf(Color.argb(200, 0, 0, 0), Color.TRANSPARENT)
             }
             addView(txtTitle)
+            addView(createBarButton("⚙ Ayarlar") { showSettingsDialog() })
+            addView(createBarButton("✕ Çıkış") { confirmExit() })
             addView(lockBadge)
         }
     }
 
+    private fun createBarButton(label: String, onClick: () -> Unit): TextView = TextView(this).apply {
+        text = label
+        textSize = 14f
+        setTextColor(Color.WHITE)
+        setPadding(dp(14), dp(8), dp(14), dp(8))
+        background = GradientDrawable().apply {
+            cornerRadius = dp(20).toFloat()
+            setColor(Color.argb(160, 30, 41, 59))
+        }
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginEnd = dp(8) }
+        isClickable = true
+        setOnClickListener { if (!isChildLocked) onClick() }
+    }
+
+    /** Kilit açıkken açılan ayarlar menüsü. */
+    private fun showSettingsDialog() {
+        handler.removeCallbacks(hideControlsRunnable)
+        val autoSec = prefs.getInt("auto_lock_sec", 30)
+        val autoLabel = if (autoSec <= 0) "Kapalı" else if (autoSec < 60) "$autoSec sn" else "${autoSec / 60} dk"
+        val optimize = prefs.getBoolean("auto_optimize", false)
+        val items = arrayOf(
+            "📁 Video klasörünü değiştir",
+            "⏱ Otomatik kilit: $autoLabel",
+            "⚡ Açılışta sistem optimizasyonu: " + if (optimize) "Açık" else "Kapalı",
+            "🔐 Üstte gösterme izni (tam ekran kilit)",
+            "📱 Telefon ayarlarını aç",
+            "🚪 Uygulamadan çık"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("⚙ Ayarlar · Video Döngü " + appVersion())
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> launchFolderPicker()
+                    1 -> chooseAutoLock()
+                    2 -> {
+                        prefs.edit().putBoolean("auto_optimize", !optimize).apply()
+                        showInfo("⚡ Sistem optimizasyonu " + if (!optimize) "AÇIK" else "KAPALI")
+                    }
+                    3 -> openSystemScreen(
+                        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                    )
+                    4 -> openSystemScreen(Intent(Settings.ACTION_SETTINGS))
+                    5 -> confirmExit()
+                }
+            }
+            .setNegativeButton("Kapat", null)
+            .setOnDismissListener { scheduleHideControls() }
+            .show()
+    }
+
+    private fun chooseAutoLock() {
+        val values = intArrayOf(30, 60, 300, 0)
+        val labels = arrayOf("30 saniye", "1 dakika", "5 dakika", "Kapalı (elle kilitlenir)")
+        val current = values.indexOf(prefs.getInt("auto_lock_sec", 30)).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle("⏱ Otomatik kilit")
+            .setSingleChoiceItems(labels, current) { d, which ->
+                prefs.edit().putInt("auto_lock_sec", values[which]).apply()
+                scheduleAutoLock()
+                showInfo("⏱ Otomatik kilit: " + labels[which])
+                d.dismiss()
+            }
+            .setNegativeButton("Vazgeç", null)
+            .show()
+    }
+
+    /** Sistem ekranı açmadan önce sabitlemeyi kaldırır (kilit zaten açık). */
+    private fun openSystemScreen(intent: Intent) {
+        stopScreenPinning()
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun confirmExit() {
+        AlertDialog.Builder(this)
+            .setTitle("🚪 Uygulamadan çıkılsın mı?")
+            .setMessage(
+                "Çık: video durur; şarj takılınca veya cihaz açılınca uygulama yine kendiliğinden başlar.\n\n" +
+                        "Tamamen kapat: arka plan hizmeti de durur; uygulamayı yeniden açana kadar kendiliğinden başlamaz."
+            )
+            .setPositiveButton("Çık") { _, _ -> exitApp(stopService = false) }
+            .setNeutralButton("Tamamen kapat") { _, _ -> exitApp(stopService = true) }
+            .setNegativeButton("Vazgeç", null)
+            .show()
+    }
+
+    private fun exitApp(stopService: Boolean) {
+        wantPlaying = false
+        videoView.stopPlayback()
+        handler.removeCallbacksAndMessages(null)
+        cancelSleepCountdown()
+        hideLockOverlay()
+        stopScreenPinning()
+        if (stopService) {
+            try {
+                stopService(Intent(this, VideoLoopService::class.java))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        finishAndRemoveTask()
+    }
+
+    private fun appVersion(): String = try {
+        packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+    } catch (e: Exception) {
+        ""
+    }
+
+    /**
+     * Ortadaki oynat / önceki / sonraki düğmelerini ekranın kısa kenarına göre boyutlandırır:
+     * oynat düğmesi kısa kenarın dikeyde ~%28'i, yatayda ~%22'si (en az 72 dp, en çok 200 dp),
+     * yan düğmeler yarısı kadar.
+     */
+    private fun resizeCenterControls(width: Int, height: Int) {
+        if (!::btnPlay.isInitialized || width <= 0 || height <= 0) return
+        val shortSide = minOf(width, height)
+        // Yatayda alt kontrol çubuğuna binmesin diye biraz daha küçük
+        val ratio = if (width > height) 0.22f else 0.28f
+        val play = (shortSide * ratio).toInt().coerceIn(dp(72), dp(200))
+        val side = (play * 0.5f).toInt().coerceAtLeast(dp(44))
+        val margin = (play * 0.08f).toInt().coerceAtLeast(dp(6))
+        fun fit(v: TextView, size: Int, textRatio: Float) {
+            v.layoutParams = (v.layoutParams as LinearLayout.LayoutParams).apply {
+                this.width = size
+                this.height = size
+                setMargins(margin, margin, margin, margin)
+            }
+            v.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * textRatio)
+        }
+        fit(btnPlay, play, 0.36f)
+        fit(btnPrev, side, 0.40f)
+        fit(btnNext, side, 0.40f)
+    }
+
     private fun buildCenterControls(): LinearLayout {
-        val btnPrev = createModernButton("⏮", sizeDp = 70, textSizeSp = 28f) { prev() }
-        // 300dp x 300dp, 90sp metin boyutu
-        btnPlay = createModernButton("⏸", sizeDp = 300, textSizeSp = 90f) { togglePlay() }
-        val btnNext = createModernButton("⏭", sizeDp = 70, textSizeSp = 28f) { next() }
+        // Boyutlar resizeCenterControls ile ekrana göre ayarlanır; buradakiler başlangıç değerleri
+        btnPrev = createModernButton("⏮", sizeDp = 56, textSizeSp = 22f) { prev() }
+        btnPlay = createModernButton("⏸", sizeDp = 112, textSizeSp = 40f) { togglePlay() }
+        btnNext = createModernButton("⏭", sizeDp = 56, textSizeSp = 22f) { next() }
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1206,7 +1468,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun scheduleAutoLock() {
         handler.removeCallbacks(autoLockRunnable)
-        if (!isChildLocked) handler.postDelayed(autoLockRunnable, AUTO_LOCK_DELAY_MS)
+        val sec = prefs.getInt("auto_lock_sec", (AUTO_LOCK_DELAY_MS / 1000).toInt())
+        if (!isChildLocked && sec > 0) handler.postDelayed(autoLockRunnable, sec * 1000L)
     }
 
     // Kilit açıkken her dokunuş ve tuş, otomatik kilit süresini yeniden başlatır
@@ -1224,6 +1487,7 @@ class MainActivity : AppCompatActivity() {
         if (::btnPlay.isInitialized) {
             btnPlay.text = if (videoView.isPlaying) "⏸" else "▶"
         }
+        updateMediaSession()
     }
 
     private fun startPlayback() {
@@ -1300,6 +1564,7 @@ class MainActivity : AppCompatActivity() {
             txtTitle.text = String.format(Locale.getDefault(), "%d/%d - %s", index + 1, playlist.size, playlistNames[index])
         }
         showInfo(String.format(Locale.getDefault(), "%d / %d\n%s", index + 1, playlist.size, playlistNames.getOrNull(index) ?: ""))
+        updateMediaSession()
     }
 
     private fun next() {
@@ -1326,6 +1591,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         cancelSleepCountdown()
+        mediaSession?.let {
+            it.isActive = false
+            it.release()
+        }
+        mediaSession = null
         handler.removeCallbacks(barSuppressionRunnable)
         lockOverlay?.let {
             try {
@@ -1352,7 +1622,7 @@ class MainActivity : AppCompatActivity() {
         // Klasör seçicide dahili depolamayı göster (resmî olmayan ama yaygın desteklenen ek)
         private const val EXTRA_SHOW_ADVANCED = "android.content.extra.SHOW_ADVANCED"
         private const val AUTO_LOCK_DELAY_MS = 30_000L
-        private const val AUTO_LOCKED_MSG = "🔒 30 sn dokunulmadı\nÇocuk Kilidi otomatik AKTİF"
+        private const val AUTO_LOCKED_MSG = "🔒 Bir süre dokunulmadı\nÇocuk Kilidi otomatik AKTİF"
 
         // Kumanda / kulaklık medya tuşları (kilitliyken de çalışır)
         private val MEDIA_KEYS = setOf(

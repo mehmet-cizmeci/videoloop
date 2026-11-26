@@ -51,12 +51,17 @@ Uygulama **kilitli başlar**. Kilit aktifken:
 Ekrana **art arda 5 kez** hızlıca dokunun (dokunuşlar arası en fazla yarım saniye). Kilit açılınca kontroller görünür.
 Birden fazla parmakla dokunma sayılmaz, böylece çocuğun avuç içiyle basması kilidi açmaz.
 
+### Kilit açıkken
+Üst çubukta **⚙ Ayarlar** (video klasörü, otomatik kilit süresi, sistem optimizasyonu, izinler, telefon ayarları) ve
+**✕ Çıkış** düğmeleri vardır. *Çık*: video durur, şarj takılınca veya cihaz açılınca uygulama yine başlar.
+*Tamamen kapat*: arka plan hizmeti de durur.
+
 ### Tekrar kilitlemek
 Kilit açıkken sağ üstteki **"🔓 Kilitle"** düğmesine dokunun (kontroller gizliyse önce bir kez ekrana dokunup gösterin)
 ya da ekrana art arda 5 kez dokunun.
 
 ### Otomatik kilit
-Kilit açıkken ekrana veya kumandaya **30 saniye** dokunulmazsa çocuk kilidi kendiliğinden devreye girer
+Kilit açıkken ekrana veya kumandaya **30 saniye** (Ayarlar'dan 1 dk / 5 dk / kapalı yapılabilir) dokunulmazsa çocuk kilidi kendiliğinden devreye girer
 ("30 sn dokunulmadı" yazısı görünür). Her dokunuş ya da tuş bu süreyi yeniden başlatır.
 Klasör seçici veya başka bir pencere açıkken otomatik kilit beklemeye alınır.
 
@@ -64,7 +69,7 @@ Klasör seçici veya başka bir pencere açıkken otomatik kilit beklemeye alın
 | | Android 4+ sürümü | Android 8+ sürümü |
 |---|---|---|
 | Tam ekran üst pencere | ✅ Tüm uygulamaların, ana ekranın ve Son Uygulamalar'ın üstünde | ✅ Tüm uygulamaların üstünde |
-| Ekran sabitleme (Screen pinning) | — (Android 4.4'te yok) | ✅ Ana Ekran, Son Uygulamalar ve bildirim panelini kapatır |
+| Ekran sabitleme (Screen pinning) | — (Android 4.4'te yok) | Android 12+'da (veya üstte gösterme izni yoksa) — açılışta bir kez sorulur |
 | Gereken izin | Kurulumda otomatik verilir | "Diğer uygulamaların üzerinde göster" (uygulama ilk açılışta ister) |
 
 ---
@@ -89,7 +94,7 @@ Klasör seçici veya başka bir pencere açıkken otomatik kilit beklemeye alın
 2. **Cihaz yöneticisi** yetkisini etkinleştirin (şarj çıkarılınca ekranı kapatabilmek için).
 3. **Android 8+:** "Diğer uygulamaların üzerinde göster" iznini açın (tam ekran çocuk kilidi için).
 4. **Video klasörünü seçin** (kilit bu aşamada devreye girmez, klasörü rahatça seçebilirsiniz).
-5. **Android 8+:** İlk kilitlemede Android "Uygulama sabitlendi" bilgisini gösterir; **Anladım**'a dokunun.
+5. **Android 12+:** Açılışta Android "Uygulama sabitlendi" penceresini gösterir; **Anladım**'a dokunun.
 
 Bu adımlardan sonra videolar oynamaya başlar ve çocuk kilidi aktif olur.
 
@@ -146,15 +151,27 @@ Bu durumda o dosyaların adından emojileri silin (Video Müzik İndirici'nin **
   bu çubuğun üstüne çıkmasına izin vermez. Düğmelere basılsa bile video yerinden oynamaz.
 - **Android 4.4:** Kilitliyken Ana Ekran'a basıldıysa, kilit açıldıktan sonra uygulamanın öne gelmesi Android kuralı gereği
   en fazla 5 saniye gecikebilir.
-- **Android 8+:** Ekran sabitleme, kilit açılınca **bilerek kaldırılmaz** (her kilitte yeniden sabitlemek dokunuşların
-  kaybolmasına yol açıyordu). Uygulamadan tamamen çıkmak için kilidi açın, sonra Android'in sabitleme kaldırma hareketini
-  kullanın: hareketle gezinmede **alttan yukarı kaydırıp basılı tutun**; 3 düğmeli gezinmede **Geri ve Son Uygulamalar'a birlikte basılı tutun**.
+- **Android 12+:** Bildirim paneli tam ekran video penceresinin üstüne çekilebildiği için ekran sabitleme kullanılır;
+  Android açılışta bir kez "Uygulama sabitlendi" penceresini gösterir, **Anladım**'a dokunun. Sabitleme kilit açılınca
+  kaldırılmaz; uygulamadan çıkmak için kilidi açıp **✕ Çıkış** düğmesini kullanın.
+- **Android 8–11:** Üstte gösterme izni verildiyse ekran sabitleme kullanılmaz (onay penceresi çıkmaz).
 - **Android 8+:** "Diğer uygulamaların üzerinde göster" izni verilmezse kilit, ekran sabitleme ve dokunma engeliyle çalışmaya devam eder.
 - Android 12 ve üstünde uygulamalar bildirim panelini kendileri kapatamaz; bu sürümlerde paneli ekran sabitleme engeller.
 
 ---
 
 ## 📝 Sürüm geçmişi
+
+### v1.4
+- **Araç / Bluetooth kontrolü (Android 8+):** Araç multimedya sistemi, Bluetooth kulaklık ve kumandadan oynat, duraklat,
+  sonraki ve önceki komutları artık çalışıyor (çocuk kilidi aktifken de). Araç ekranında video adı görünür.
+- **Kapanmayan "Uygulama sabitlendi" penceresi düzeltildi:** Android 8–11'de üstte gösterme izni verildiyse ekran sabitleme
+  hiç kullanılmaz; Android 12+'da yalnızca açılışta bir kez sorulur, kilit açılıp kapandıkça yeniden sorulmaz.
+- **Kilit açıkken Ayarlar ve Çıkış:** üst çubukta **⚙ Ayarlar** (klasör, otomatik kilit süresi 30 sn / 1 dk / 5 dk / kapalı,
+  sistem optimizasyonu, üstte gösterme izni, telefon ayarları) ve **✕ Çıkış** (Çık / Tamamen kapat) düğmeleri.
+- **Ortadaki düğmeler ekrana göre ölçeklenir:** oynat/duraklat düğmesi ekranın kısa kenarına göre boyutlanır
+  (dikey ve yatayda); ekran döndürülünce video baştan başlamaz.
+- Üst ve alt kontrol çubukları saat ve gezinme çubuğunun altında kalmıyor.
 
 ### v1.3
 - APK'lar artık kalıcı yayın anahtarıyla imzalı (bkz. [Kurulum](#-kurulum); v1.2'den geçerken eski uygulamayı bir kez kaldırın).
