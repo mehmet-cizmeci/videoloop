@@ -695,8 +695,9 @@ class MainActivity : AppCompatActivity() {
         if (locked) {
             hideSystemBars()
             collapseStatusBar()
-            // Sabitleme Ana Ekran, Son Uygulamalar ve bildirim panelini kapatır (panel Android 12+'da
-            // video penceresinin üstünde açılabildiği için gerekli). Video penceresi her şeyin üstünde kalır.
+            // Video penceresi (üstte gösterme izni) Ana Ekran ve Son Uygulamaların üstünde kalır.
+            // Ekran sabitleme kullanılmaz (bkz. usePinning); önceki sürümden kalan sabitleme kaldırılır.
+            stopScreenPinning()
             startScreenPinning()
             showLockOverlay()
             handler.post(barSuppressionRunnable)
@@ -826,16 +827,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Ekran sabitleme her istekte ekranın yarısını kaplayan "Uygulama sabitlendi" penceresi açar
-     * (Hayır, teşekkürler / Anladım). Bu yüzden:
-     * - Android 8–11'de tam ekran video penceresi (üstte gösterme izni) varken sabitleme kullanılmaz:
-     *   pencere Ana ekran ve Son uygulamaların üstünde durur, bildirim paneli de kapatılabilir.
-     * - Android 12+'da (panel video penceresinin üstüne çekilebildiği için) ya da izin yoksa sabitleme
-     *   kullanılır, ama yalnızca bir kez istenir ve kilit açılıp kapandıkça yeniden istenmez.
-     *   Sabitleme yalnızca Çıkış ve Telefon ayarları ile kaldırılır.
+     * Ekran sabitleme (startLockTask) her istekte ekranın yarısını kaplayan "Ekran sabitlendi"
+     * penceresi (Hayır, teşekkürler / Anladım) açtığı için kullanıcı isteğiyle hiç kullanılmaz.
+     * Kilit; tam ekran video penceresi (üstte gösterme izni), dokunma katmanı, sistem çubuklarının
+     * gizlenmesi ve bildirim panelinin kapatılmasıyla sağlanır. Eski sürümden kalma bir sabitleme
+     * varsa stopScreenPinning ile kaldırılır.
      */
-    private fun usePinning(): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || !Settings.canDrawOverlays(this)
+    @Suppress("SameReturnValue")
+    private fun usePinning(): Boolean = false
 
     /** Sabitleme penceresi ekrandayken sistem pencereleri kapatılmaz; kullanıcı yanıt verebilsin. */
     private fun pinConfirmPending(): Boolean = pinRequested && !isScreenPinned()

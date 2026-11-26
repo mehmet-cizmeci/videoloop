@@ -69,7 +69,7 @@ Klasör seçici veya başka bir pencere açıkken otomatik kilit beklemeye alın
 | | Android 4+ sürümü | Android 8+ sürümü |
 |---|---|---|
 | Tam ekran üst pencere | ✅ Tüm uygulamaların, ana ekranın ve Son Uygulamalar'ın üstünde | ✅ Tüm uygulamaların üstünde |
-| Ekran sabitleme (Screen pinning) | — (Android 4.4'te yok) | Android 12+'da (veya üstte gösterme izni yoksa) — açılışta bir kez sorulur |
+| Ekran sabitleme (Screen pinning) | — (Android 4.4'te yok) | — (v1.4'ten itibaren kullanılmaz) |
 | Gereken izin | Kurulumda otomatik verilir | "Diğer uygulamaların üzerinde göster" (uygulama ilk açılışta ister) |
 
 ---
@@ -94,7 +94,6 @@ Klasör seçici veya başka bir pencere açıkken otomatik kilit beklemeye alın
 2. **Cihaz yöneticisi** yetkisini etkinleştirin (şarj çıkarılınca ekranı kapatabilmek için).
 3. **Android 8+:** "Diğer uygulamaların üzerinde göster" iznini açın (tam ekran çocuk kilidi için).
 4. **Video klasörünü seçin** (kilit bu aşamada devreye girmez, klasörü rahatça seçebilirsiniz).
-5. **Android 12+:** Açılışta Android "Uygulama sabitlendi" penceresini gösterir; **Anladım**'a dokunun.
 
 Bu adımlardan sonra videolar oynamaya başlar ve çocuk kilidi aktif olur.
 
@@ -151,10 +150,9 @@ Bu durumda o dosyaların adından emojileri silin (Video Müzik İndirici'nin **
   bu çubuğun üstüne çıkmasına izin vermez. Düğmelere basılsa bile video yerinden oynamaz.
 - **Android 4.4:** Kilitliyken Ana Ekran'a basıldıysa, kilit açıldıktan sonra uygulamanın öne gelmesi Android kuralı gereği
   en fazla 5 saniye gecikebilir.
-- **Android 12+:** Bildirim paneli tam ekran video penceresinin üstüne çekilebildiği için ekran sabitleme kullanılır;
-  Android açılışta bir kez "Uygulama sabitlendi" penceresini gösterir, **Anladım**'a dokunun. Sabitleme kilit açılınca
-  kaldırılmaz; uygulamadan çıkmak için kilidi açıp **✕ Çıkış** düğmesini kullanın.
-- **Android 8–11:** Üstte gösterme izni verildiyse ekran sabitleme kullanılmaz (onay penceresi çıkmaz).
+- **Android 8+:** Ekran sabitleme kullanılmaz (onay penceresi çıkmasın diye). "Diğer uygulamaların üzerinde göster" izni
+  verilmezse çocuk Ana Ekran tuşuyla uygulamadan çıkabilir; izni mutlaka verin (kilit açıkken ⚙ Ayarlar → Üstte gösterme izni).
+- **Android 12+:** Bildirim paneli video penceresinin üstüne çekilebilir; panel açılsa da video yerinde kalır.
 - **Android 8+:** "Diğer uygulamaların üzerinde göster" izni verilmezse kilit, ekran sabitleme ve dokunma engeliyle çalışmaya devam eder.
 - Android 12 ve üstünde uygulamalar bildirim panelini kendileri kapatamaz; bu sürümlerde paneli ekran sabitleme engeller.
 
@@ -165,8 +163,9 @@ Bu durumda o dosyaların adından emojileri silin (Video Müzik İndirici'nin **
 ### v1.4
 - **Araç / Bluetooth kontrolü (Android 8+):** Araç multimedya sistemi, Bluetooth kulaklık ve kumandadan oynat, duraklat,
   sonraki ve önceki komutları artık çalışıyor (çocuk kilidi aktifken de). Araç ekranında video adı görünür.
-- **Kapanmayan "Uygulama sabitlendi" penceresi düzeltildi:** Android 8–11'de üstte gösterme izni verildiyse ekran sabitleme
-  hiç kullanılmaz; Android 12+'da yalnızca açılışta bir kez sorulur, kilit açılıp kapandıkça yeniden sorulmaz.
+- **"Ekran sabitlendi" penceresi kaldırıldı:** Uygulama artık ekran sabitleme kullanmıyor; ekranın yarısını kaplayan
+  "Hayır, teşekkürler / Anladım" penceresi hiç çıkmaz. Kilit, tam ekran video penceresiyle sağlanır
+  ("Diğer uygulamaların üzerinde göster" izni verilmelidir).
 - **Kilit açıkken Ayarlar ve Çıkış:** üst çubukta **⚙ Ayarlar** (klasör, otomatik kilit süresi 30 sn / 1 dk / 5 dk / kapalı,
   sistem optimizasyonu, üstte gösterme izni, telefon ayarları) ve **✕ Çıkış** (Çık / Tamamen kapat) düğmeleri.
 - **Ortadaki düğmeler ekrana göre ölçeklenir:** oynat/duraklat düğmesi ekranın kısa kenarına göre boyutlanır
