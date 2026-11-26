@@ -122,7 +122,12 @@ Video Döngü, videoları cihazın **kendi video çözücüsüyle** oynatır. Ci
   1080p'yi veya 60 fps'i kaldıramayabilir.
 - **Her cihazda çalışan biçim:** **H.264 (MP4), en fazla 720p, en fazla 30 fps, AAC ses.**
 
-Videoları YouTube'dan indiriyorsanız indiricide **H.264 / MP4 ve 720p** seçin. Elinizdeki videoları dönüştürmek için
+**En kolay yol:** ücretsiz [Video Müzik İndirici](https://github.com/mehmet-cizmeci/video-muzik-indirici) (2.1 ve üstü)
+varsayılan **Android uyumlu** modunda videoları zaten H.264 / 720p / 30 fps MP4 olarak indirir ve dosya adlarındaki
+emojileri temizler. Elinizdeki videoları aynı uygulamanın **MP4 Dönüştürücü** penceresiyle tek tıkla bu biçime çevirebilirsiniz
+(orijinallere dokunmaz).
+
+Başka bir indirici kullanıyorsanız **H.264 / MP4 ve 720p** seçin. Komut satırından dönüştürmek için
 ücretsiz [ffmpeg](https://ffmpeg.org/) ile:
 
 ```bash
@@ -131,7 +136,7 @@ ffmpeg -i girdi.mp4 -map 0:v:0 -map 0:a:0? -vf "scale=-2:'min(720,ih)',fps=30,fo
 
 **Dosya adlarında emoji:** Android 4.4 cihazlarda indirilen bazı dosyaların adındaki emojiler bozuk kodlanabiliyor ve
 Android 8.1, böyle tek bir dosya yüzünden bütün klasörü listeleyemiyor (klasör seçicide "İçerik şu anda yüklenemiyor").
-Bu durumda o dosyaların adından emojileri silin.
+Bu durumda o dosyaların adından emojileri silin (Video Müzik İndirici'nin **Adları düzelt** seçeneği bunu kendiliğinden yapar).
 
 ---
 
